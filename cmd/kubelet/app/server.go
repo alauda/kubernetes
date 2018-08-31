@@ -388,7 +388,6 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		DockerClientConfig:  dockerClientConfig,
 		KubeClient:          nil,
 		HeartbeatClient:     nil,
-		ExternalKubeClient:  nil,
 		EventClient:         nil,
 		Mounter:             mounter,
 		OOMAdjuster:         oom.NewOOMAdjuster(),
@@ -543,16 +542,14 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	// if in standalone mode, indicate as much by setting all clients to nil
 	if standaloneMode {
 		kubeDeps.KubeClient = nil
-		kubeDeps.ExternalKubeClient = nil
 		kubeDeps.EventClient = nil
 		kubeDeps.HeartbeatClient = nil
 		glog.Warningf("standalone mode, no API client")
-	} else if kubeDeps.KubeClient == nil || kubeDeps.ExternalKubeClient == nil || kubeDeps.EventClient == nil || kubeDeps.HeartbeatClient == nil {
+	} else if kubeDeps.KubeClient == nil || kubeDeps.EventClient == nil || kubeDeps.HeartbeatClient == nil {
 		// initialize clients if not standalone mode and any of the clients are not provided
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
-		var heartbeatClient v1core.CoreV1Interface
-		var externalKubeClient clientset.Interface
+		var heartbeatClient clientset.Interface
 
 		clientConfig, err := createAPIServerClientConfig(s)
 		if err != nil {
@@ -582,10 +579,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 			clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.CertificatesV1beta1().CertificateSigningRequests())
 			clientCertificateManager.Start()
 		}
-		externalKubeClient, err = clientset.NewForConfig(clientConfig)
-		if err != nil {
-			glog.Warningf("New kubeClient from clientConfig error: %v", err)
-		}
 
 		// make a separate client for events
 		eventClientConfig := *clientConfig
@@ -606,7 +599,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		}
 
 		kubeDeps.KubeClient = kubeClient
-		kubeDeps.ExternalKubeClient = externalKubeClient
 		if heartbeatClient != nil {
 			kubeDeps.HeartbeatClient = heartbeatClient
 			kubeDeps.OnHeartbeatFailure = closeAllConns
@@ -625,7 +617,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	}
 
 	if kubeDeps.Auth == nil {
-		auth, err := BuildAuth(nodeName, kubeDeps.ExternalKubeClient, s.KubeletConfiguration)
+		auth, err := BuildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
 		if err != nil {
 			return err
 		}

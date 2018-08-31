@@ -241,7 +241,6 @@ type Dependencies struct {
 	HeartbeatClient         v1core.CoreV1Interface
 	OnHeartbeatFailure      func()
 	KubeClient              clientset.Interface
-	ExternalKubeClient      clientset.Interface
 	Mounter                 mount.Interface
 	OOMAdjuster             *oom.OOMAdjuster
 	OSInterface             kubecontainer.OSInterface
