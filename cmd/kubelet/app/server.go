@@ -549,7 +549,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		// initialize clients if not standalone mode and any of the clients are not provided
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
-		var heartbeatClient clientset.Interface
+		var heartbeatClient v1core.CoreV1Interface
 
 		clientConfig, err := createAPIServerClientConfig(s)
 		if err != nil {
