@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"pkg/mod/k8s.io/klog@v1.0.0"
 	"strings"
 	"time"
 
@@ -260,6 +261,7 @@ func (h *HTTPExtender) Filter(
 		args       *schedulerapi.ExtenderArgs
 	)
 
+	klog.V(1).Infof("** extender filter for Pod %s", pod.Name)
 	if h.filterVerb == "" {
 		return nodes, schedulerapi.FailedNodesMap{}, nil
 	}
@@ -284,12 +286,15 @@ func (h *HTTPExtender) Filter(
 	}
 
 	if err := h.send(h.filterVerb, args, &result); err != nil {
+		klog.V(1).Infof("** send to extender error for Pod %s: %v", pod.Name, err)
 		return nil, nil, err
 	}
 	if result.Error != "" {
+		klog.V(1).Infof("** extender filter result error for Pod %s: %v", pod.Name, result.Error)
 		return nil, nil, fmt.Errorf(result.Error)
 	}
 
+	klog.V(1).Infof("** extender filter result for Pod %s: %+v", pod.Name, result)
 	if h.nodeCacheCapable && result.NodeNames != nil {
 		nodeResult = make([]*v1.Node, 0, len(*result.NodeNames))
 		for i := range *result.NodeNames {
@@ -302,6 +307,7 @@ func (h *HTTPExtender) Filter(
 		}
 	}
 
+	klog.V(1).Infof("** extender filter node result for Pod %s: %+v", pod.Name, nodeResult)
 	return nodeResult, result.FailedNodes, nil
 }
 

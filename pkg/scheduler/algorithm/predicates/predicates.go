@@ -777,6 +777,11 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 			}
 		}
 		if allocatable.ScalarResources[rName] < rQuant+nodeInfo.RequestedResource().ScalarResources[rName] {
+		   klog.V(4).Infof("Cannot allocate %v for pod %v/%v, its request resource for %v is %v, allocatable is %v, pod request %v",
+					node.Name, pod.Namespace, pod.Name, rName, nodeInfo.RequestedResource().ScalarResources[rName], allocatable.ScalarResources[rName],
+					rQuant)
+			klog.V(4).Infof("Node debug info: %v", nodeInfo.String())
+
 			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ScalarResources[rName], nodeInfo.RequestedResource().ScalarResources[rName], allocatable.ScalarResources[rName]))
 		}
 	}

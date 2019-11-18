@@ -95,3 +95,8 @@ func (c *Cache) Snapshot() *schedulerinternalcache.Snapshot {
 
 // NodeTree is a fake method for testing.
 func (c *Cache) NodeTree() *schedulerinternalcache.NodeTree { return nil }
+
+// GetNodeInfo is a fake method for testing.
+func (c *Cache) GetNodeInfo(nodeName string) (*v1.Node, error) {
+	return nil, nil
+}

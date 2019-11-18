@@ -100,6 +100,9 @@ type Cache interface {
 	// on this node.
 	UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error
 
+	// GetNodeInfo returns the node object with node string.
+	GetNodeInfo(nodeName string) (*v1.Node, error)
+
 	// List lists all cached pods (including assumed ones).
 	List(labels.Selector) ([]*v1.Pod, error)
 
