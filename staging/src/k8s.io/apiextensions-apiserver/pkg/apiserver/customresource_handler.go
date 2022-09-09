@@ -76,6 +76,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -1110,6 +1111,7 @@ type CRDRESTOptionsGetter struct {
 	EnableGarbageCollection bool
 	DeleteCollectionWorkers int
 	CountMetricPollPeriod   time.Duration
+	TransformerOverrides    map[schema.GroupResource]value.Transformer
 }
 
 func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
@@ -1123,6 +1125,11 @@ func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (gen
 	}
 	if t.EnableWatchCache {
 		ret.Decorator = genericregistry.StorageWithCacher()
+	}
+	if t.TransformerOverrides != nil {
+		if transformer, ok := t.TransformerOverrides[resource]; ok {
+			ret.StorageConfig.Transformer = transformer
+		}
 	}
 	return ret, nil
 }
