@@ -537,7 +537,7 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 	}
 
 	containers, err := ds.client.ListContainers(opts)
-	if err != nil {
+	if err != nil && !libdocker.IsContainerNotFoundError(err) {
 		return nil, err
 	}
 

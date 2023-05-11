@@ -30,6 +30,8 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	dockerstrslice "github.com/docker/docker/api/types/strslice"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -64,7 +66,7 @@ func (ds *dockerService) ListContainers(_ context.Context, r *runtimeapi.ListCon
 		}
 	}
 	containers, err := ds.client.ListContainers(opts)
-	if err != nil {
+	if err != nil && !libdocker.IsContainerNotFoundError(err) {
 		return nil, err
 	}
 	// Convert docker to runtime api containers.
@@ -308,6 +310,9 @@ func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartCo
 func (ds *dockerService) StopContainer(_ context.Context, r *runtimeapi.StopContainerRequest) (*runtimeapi.StopContainerResponse, error) {
 	err := ds.client.StopContainer(r.ContainerId, time.Duration(r.Timeout)*time.Second)
 	if err != nil {
+		if libdocker.IsContainerNotFoundError(err) {
+			err = status.Error(codes.NotFound, err.Error())
+		}
 		return nil, err
 	}
 	return &runtimeapi.StopContainerResponse{}, nil
