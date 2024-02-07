@@ -317,8 +317,8 @@ func podMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 
 // PodUsageFunc returns the quota usage for a pod.
 // A pod is charged for quota if the following are not true.
-//  - pod has a terminal phase (failed or succeeded)
-//  - pod has been marked for deletion and grace period has expired
+//   - pod has a terminal phase (failed or succeeded)
+//   - pod has been marked for deletion and grace period has expired
 func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, error) {
 	pod, err := toExternalPodOrError(obj)
 	if err != nil {
@@ -336,6 +336,7 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	// by convention, we do not quota compute resources that have reached end-of life
 	// note: the "pods" resource is considered a compute resource since it is tied to life-cycle.
 	if !QuotaV1Pod(pod, clock) {
+		fmt.Printf("evaluator pod name:%s/%s -- notQuotaV1Pod", pod.Namespace, pod.Name)
 		return result, nil
 	}
 
@@ -358,6 +359,7 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 		requests = quota.Add(requests, pod.Spec.Overhead)
 		limits = quota.Add(limits, pod.Spec.Overhead)
 	}
+	fmt.Printf("evaluator pod name:%s/%s, requests: %+v, limits: %+v", pod.Namespace, pod.Name, requests, limits)
 	result = quota.Add(result, podComputeUsageHelper(requests, limits))
 	return result, nil
 }

@@ -225,6 +225,7 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 			result.Used = quota.Add(result.Used, usage)
 		}
 	}
+	fmt.Printf("evaluator usage: %+v", result.Used)
 	return result, nil
 }
 
