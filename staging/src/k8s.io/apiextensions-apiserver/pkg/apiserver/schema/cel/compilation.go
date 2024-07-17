@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -106,6 +107,9 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 
 	if len(s.Extensions.XValidations) == 0 {
 		return nil, nil
+	}
+	if declType == nil {
+		return nil, errors.New("failed to convert to declType for CEL validation rules")
 	}
 	celRules := s.Extensions.XValidations
 
