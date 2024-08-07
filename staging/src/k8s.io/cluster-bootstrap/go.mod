@@ -5,8 +5,8 @@ module k8s.io/cluster-bootstrap
 go 1.16
 
 require (
-	github.com/stretchr/testify v1.6.1
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
+	github.com/stretchr/testify v1.8.1
+	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
 	gopkg.in/square/go-jose.v2 v2.2.2
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

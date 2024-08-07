@@ -14,8 +14,8 @@ require (
 	github.com/googleapis/gnostic v0.4.1
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.6.1
-	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
+	github.com/stretchr/testify v1.8.1
+	go.etcd.io/etcd v0.5.0-alpha.5.0.20230711085208-c92fb80f3944
 	google.golang.org/grpc v1.27.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.0.0
@@ -26,7 +26,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-openapi v0.0.0-20211110012726-3cc51fd1e909
-	k8s.io/utils v0.0.0-20210521133846-da695404a2bc
+	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
 	sigs.k8s.io/yaml v1.2.0
 )

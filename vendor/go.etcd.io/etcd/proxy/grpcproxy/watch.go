@@ -46,12 +46,12 @@ type watchProxy struct {
 	kv clientv3.KV
 }
 
-func NewWatchProxy(c *clientv3.Client) (pb.WatchServer, <-chan struct{}) {
-	cctx, cancel := context.WithCancel(c.Ctx())
+func NewWatchProxy(ctx context.Context, c *clientv3.Client) (pb.WatchServer, <-chan struct{}) {
+	cctx, cancel := context.WithCancel(ctx)
 	wp := &watchProxy{
 		cw:     c.Watcher,
 		ctx:    cctx,
-		leader: newLeader(c.Ctx(), c.Watcher),
+		leader: newLeader(ctx, c.Watcher),
 
 		kv: c.KV, // for permission checking
 	}
@@ -233,7 +233,7 @@ func (wps *watchProxyStream) recvLoop() error {
 			if err := wps.checkPermissionForWatch(cr.Key, cr.RangeEnd); err != nil {
 				wps.watchCh <- &pb.WatchResponse{
 					Header:       &pb.ResponseHeader{},
-					WatchId:      -1,
+					WatchId:      clientv3.InvalidWatchID,
 					Created:      true,
 					Canceled:     true,
 					CancelReason: err.Error(),
@@ -252,7 +252,7 @@ func (wps *watchProxyStream) recvLoop() error {
 				filters:  v3rpc.FiltersFromRequest(cr),
 			}
 			if !w.wr.valid() {
-				w.post(&pb.WatchResponse{WatchId: -1, Created: true, Canceled: true})
+				w.post(&pb.WatchResponse{WatchId: clientv3.InvalidWatchID, Created: true, Canceled: true})
 				continue
 			}
 			wps.nextWatcherID++
@@ -262,7 +262,8 @@ func (wps *watchProxyStream) recvLoop() error {
 		case *pb.WatchRequest_CancelRequest:
 			wps.delete(uv.CancelRequest.WatchId)
 		default:
-			panic("not implemented")
+			// Panic or Fatalf would allow network clients to crash the serve remotely.
+			//panic("not implemented")
 		}
 	}
 }

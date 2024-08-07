@@ -16,6 +16,7 @@ package mvcc
 
 import (
 	"go.etcd.io/etcd/auth"
+	"go.etcd.io/etcd/clientv3"
 	"sync"
 	"time"
 
@@ -40,6 +41,7 @@ var (
 type watchable interface {
 	watch(key, end []byte, startRev int64, id WatchID, ch chan<- WatchResponse, fcs ...FilterFunc) (*watcher, cancelFunc)
 	progress(w *watcher)
+	progressAll(watchers map[WatchID]*watcher) bool
 	rev() int64
 }
 
@@ -152,10 +154,13 @@ func (s *watchableStore) cancelWatcher(wa *watcher) {
 		s.mu.Lock()
 		if s.unsynced.delete(wa) {
 			slowWatcherGauge.Dec()
+			watcherGauge.Dec()
 			break
 		} else if s.synced.delete(wa) {
+			watcherGauge.Dec()
 			break
 		} else if wa.compacted {
+			watcherGauge.Dec()
 			break
 		} else if wa.ch == nil {
 			// already canceled (e.g., cancel/close race)
@@ -175,6 +180,7 @@ func (s *watchableStore) cancelWatcher(wa *watcher) {
 		}
 		if victimBatch != nil {
 			slowWatcherGauge.Dec()
+			watcherGauge.Dec()
 			delete(victimBatch, wa)
 			break
 		}
@@ -184,7 +190,6 @@ func (s *watchableStore) cancelWatcher(wa *watcher) {
 		time.Sleep(time.Millisecond)
 	}
 
-	watcherGauge.Dec()
 	wa.ch = nil
 	s.mu.Unlock()
 }
@@ -322,10 +327,10 @@ func (s *watchableStore) moveVictims() (moved int) {
 }
 
 // syncWatchers syncs unsynced watchers by:
-//	1. choose a set of watchers from the unsynced watcher group
-//	2. iterate over the set to get the minimum revision and remove compacted watchers
-//	3. use minimum revision to get all key-value pairs and send those events to watchers
-//	4. remove synced watchers in set from unsynced group and move to synced group
+//  1. choose a set of watchers from the unsynced watcher group
+//  2. iterate over the set to get the minimum revision and remove compacted watchers
+//  3. use minimum revision to get all key-value pairs and send those events to watchers
+//  4. remove synced watchers in set from unsynced group and move to synced group
 func (s *watchableStore) syncWatchers() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -456,7 +461,6 @@ func (s *watchableStore) notify(rev int64, evs []mvccpb.Event) {
 			pendingEventsGauge.Add(float64(len(eb.evs)))
 		} else {
 			// move slow watcher to victims
-			w.minRev = rev + 1
 			if victim == nil {
 				victim = make(watcherBatch)
 			}
@@ -465,6 +469,10 @@ func (s *watchableStore) notify(rev int64, evs []mvccpb.Event) {
 			s.synced.delete(w)
 			slowWatcherGauge.Inc()
 		}
+		// always update minRev
+		// in case 'send' returns true and watcher stays synced, this is needed for Restore when all watchers become unsynced
+		// in case 'send' returns false, this is needed for syncWatchers
+		w.minRev = rev + 1
 	}
 	s.addVictim(victim)
 }
@@ -483,14 +491,34 @@ func (s *watchableStore) addVictim(victim watcherBatch) {
 func (s *watchableStore) rev() int64 { return s.store.Rev() }
 
 func (s *watchableStore) progress(w *watcher) {
+	s.progressIfSync(map[WatchID]*watcher{w.id: w}, w.id)
+}
+
+func (s *watchableStore) progressAll(watchers map[WatchID]*watcher) bool {
+	return s.progressIfSync(watchers, clientv3.InvalidWatchID)
+}
+
+func (s *watchableStore) progressIfSync(watchers map[WatchID]*watcher, responseWatchID WatchID) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if _, ok := s.synced.watchers[w]; ok {
-		w.send(WatchResponse{WatchID: w.id, Revision: s.rev()})
-		// If the ch is full, this watcher is receiving events.
-		// We do not need to send progress at all.
+	// Any watcher unsynced?
+	for _, w := range watchers {
+		if _, ok := s.synced.watchers[w]; !ok {
+			return false
+		}
 	}
+
+	// If all watchers are synchronised, send out progress
+	// notification on first watcher. Note that all watchers
+	// should have the same underlying stream, and the progress
+	// notification will be broadcasted client-side if required
+	// (see dispatchEvent in client/v3/watch.go)
+	for _, w := range watchers {
+		w.send(WatchResponse{WatchID: responseWatchID, Revision: s.rev()})
+		return true
+	}
+	return true
 }
 
 type watcher struct {

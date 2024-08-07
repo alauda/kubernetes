@@ -215,6 +215,18 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					notifyc:  notifyc,
 				}
 
+				waitWALSync := shouldWaitWALSync(rd)
+				if waitWALSync {
+					// gofail: var raftBeforeSaveWaitWalSync struct{}
+					if err := r.storage.Save(rd.HardState, rd.Entries); err != nil {
+						if r.lg != nil {
+							r.lg.Fatal("failed to save Raft hard state and entries", zap.Error(err))
+						} else {
+							plog.Fatalf("failed to save state and entries error: %v", err)
+						}
+					}
+				}
+
 				updateCommittedIndex(&ap, rh)
 
 				select {
@@ -245,12 +257,14 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					// gofail: var raftAfterSaveSnap struct{}
 				}
 
-				// gofail: var raftBeforeSave struct{}
-				if err := r.storage.Save(rd.HardState, rd.Entries); err != nil {
-					if r.lg != nil {
-						r.lg.Fatal("failed to save Raft hard state and entries", zap.Error(err))
-					} else {
-						plog.Fatalf("failed to save state and entries error: %v", err)
+				if !waitWALSync {
+					// gofail: var raftBeforeSave struct{}
+					if err := r.storage.Save(rd.HardState, rd.Entries); err != nil {
+						if r.lg != nil {
+							r.lg.Fatal("failed to save Raft hard state and entries", zap.Error(err))
+						} else {
+							plog.Fatalf("failed to save state and entries error: %v", err)
+						}
 					}
 				}
 				if !raft.IsEmptyHardState(rd.HardState) {
@@ -340,6 +354,43 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 			}
 		}
 	}()
+}
+
+// For a cluster with only one member, the raft may send both the
+// unstable entries and committed entries to etcdserver, and there
+// may have overlapped log entries between them.
+//
+// etcd responds to the client once it finishes (actually partially)
+// the applying workflow. But when the client receives the response,
+// it doesn't mean etcd has already successfully saved the data,
+// including BoltDB and WAL, because:
+//  1. etcd commits the boltDB transaction periodically instead of on each request;
+//  2. etcd saves WAL entries in parallel with applying the committed entries.
+//
+// Accordingly, it might run into a situation of data loss when the etcd crashes
+// immediately after responding to the client and before the boltDB and WAL
+// successfully save the data to disk.
+// Note that this issue can only happen for clusters with only one member.
+//
+// For clusters with multiple members, it isn't an issue, because etcd will
+// not commit & apply the data before it being replicated to majority members.
+// When the client receives the response, it means the data must have been applied.
+// It further means the data must have been committed.
+// Note: for clusters with multiple members, the raft will never send identical
+// unstable entries and committed entries to etcdserver.
+//
+// Refer to https://github.com/etcd-io/etcd/issues/14370.
+func shouldWaitWALSync(rd raft.Ready) bool {
+	if len(rd.CommittedEntries) == 0 || len(rd.Entries) == 0 {
+		return false
+	}
+
+	// Check if there is overlap between unstable and committed entries
+	// assuming that their index and term are only incrementing.
+	lastCommittedEntry := rd.CommittedEntries[len(rd.CommittedEntries)-1]
+	firstUnstableEntry := rd.Entries[0]
+	return lastCommittedEntry.Term > firstUnstableEntry.Term ||
+		(lastCommittedEntry.Term == firstUnstableEntry.Term && lastCommittedEntry.Index >= firstUnstableEntry.Index)
 }
 
 func updateCommittedIndex(ap *apply, rh *raftReadyHandler) {
@@ -675,10 +726,11 @@ func restartAsStandaloneNode(cfg ServerConfig, snapshot *raftpb.Snapshot) (types
 }
 
 // getIDs returns an ordered set of IDs included in the given snapshot and
-// the entries. The given snapshot/entries can contain two kinds of
+// the entries. The given snapshot/entries can contain three kinds of
 // ID-related entry:
 // - ConfChangeAddNode, in which case the contained ID will be added into the set.
 // - ConfChangeRemoveNode, in which case the contained ID will be removed from the set.
+// - ConfChangeAddLearnerNode, in which the contained ID will be added into the set.
 func getIDs(lg *zap.Logger, snap *raftpb.Snapshot, ents []raftpb.Entry) []uint64 {
 	ids := make(map[uint64]bool)
 	if snap != nil {
@@ -693,6 +745,8 @@ func getIDs(lg *zap.Logger, snap *raftpb.Snapshot, ents []raftpb.Entry) []uint64
 		var cc raftpb.ConfChange
 		pbutil.MustUnmarshal(&cc, e.Data)
 		switch cc.Type {
+		case raftpb.ConfChangeAddLearnerNode:
+			ids[cc.NodeID] = true
 		case raftpb.ConfChangeAddNode:
 			ids[cc.NodeID] = true
 		case raftpb.ConfChangeRemoveNode:

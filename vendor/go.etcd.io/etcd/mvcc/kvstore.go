@@ -198,7 +198,7 @@ func (s *store) HashByRev(rev int64) (hash uint32, currentRev int64, compactRev 
 	compactRev, currentRev = s.compactMainRev, s.currentRev
 	s.revMu.RUnlock()
 
-	if rev > 0 && rev <= compactRev {
+	if rev > 0 && rev < compactRev {
 		s.mu.RUnlock()
 		return 0, 0, compactRev, ErrCompacted
 	} else if rev > 0 && rev > currentRev {
@@ -351,8 +351,15 @@ func (s *store) Restore(b backend.Backend) error {
 	atomic.StoreUint64(&s.consistentIndex, 0)
 	s.b = b
 	s.kvindex = newTreeIndex(s.lg)
-	s.currentRev = 1
-	s.compactMainRev = -1
+
+	{
+		// During restore the metrics might report 'special' values.
+		s.revMu.Lock()
+		s.currentRev = 1
+		s.compactMainRev = -1
+		s.revMu.Unlock()
+	}
+
 	s.fifoSched = schedule.NewFIFOScheduler()
 	s.stopc = make(chan struct{})
 
@@ -374,6 +381,7 @@ func (s *store) restore() error {
 
 	_, finishedCompactBytes := tx.UnsafeRange(metaBucketName, finishedCompactKeyName, nil, 0)
 	if len(finishedCompactBytes) != 0 {
+		s.revMu.Lock()
 		s.compactMainRev = bytesToRev(finishedCompactBytes[0]).main
 
 		if s.lg != nil {
@@ -386,6 +394,7 @@ func (s *store) restore() error {
 		} else {
 			plog.Printf("restore compact to %d", s.compactMainRev)
 		}
+		s.revMu.Unlock()
 	}
 	_, scheduledCompactBytes := tx.UnsafeRange(metaBucketName, scheduledCompactKeyName, nil, 0)
 	scheduledCompact := int64(0)
@@ -414,16 +423,22 @@ func (s *store) restore() error {
 		revToBytes(newMin, min)
 	}
 	close(rkvc)
-	s.currentRev = <-revc
 
-	// keys in the range [compacted revision -N, compaction] might all be deleted due to compaction.
-	// the correct revision should be set to compaction revision in the case, not the largest revision
-	// we have seen.
-	if s.currentRev < s.compactMainRev {
-		s.currentRev = s.compactMainRev
-	}
-	if scheduledCompact <= s.compactMainRev {
-		scheduledCompact = 0
+	{
+		s.revMu.Lock()
+		s.currentRev = <-revc
+
+		// keys in the range [compacted revision -N, compaction] might all be deleted due to compaction.
+		// the correct revision should be set to compaction revision in the case, not the largest revision
+		// we have seen.
+		if s.currentRev < s.compactMainRev {
+			s.currentRev = s.compactMainRev
+		}
+
+		if scheduledCompact <= s.compactMainRev {
+			scheduledCompact = 0
+		}
+		s.revMu.Unlock()
 	}
 
 	for key, lid := range keyToLease {

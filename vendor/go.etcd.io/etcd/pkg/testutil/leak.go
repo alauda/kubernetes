@@ -35,7 +35,6 @@ running(leaking) after all tests.
 		defer testutil.AfterTest(t)
 		...
 	}
-
 */
 func CheckLeakedGoroutine() bool {
 	if testing.Short() {
@@ -118,6 +117,7 @@ func interestingGoroutines() (gs []string) {
 		}
 		stack := strings.TrimSpace(sl[1])
 		if stack == "" ||
+			strings.Contains(stack, "created by testing.runTests.func1") ||
 			strings.Contains(stack, "sync.(*WaitGroup).Done") ||
 			strings.Contains(stack, "os.(*file).close") ||
 			strings.Contains(stack, "created by os/signal.init") ||

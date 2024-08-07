@@ -63,7 +63,7 @@ import (
 
 const (
 	// RequestWaitTimeout is the time duration to wait for a request to go through or detect leader loss.
-	RequestWaitTimeout = 3 * time.Second
+	RequestWaitTimeout = 4 * time.Second
 	tickDuration       = 10 * time.Millisecond
 	requestTimeout     = 20 * time.Second
 
@@ -152,8 +152,10 @@ type ClusterConfig struct {
 
 	EnableLeaseCheckpoint   bool
 	LeaseCheckpointInterval time.Duration
+	LeaseCheckpointPersist  bool
 
 	WatchProgressNotifyInterval time.Duration
+	CorruptCheckTime            time.Duration
 }
 
 type cluster struct {
@@ -297,8 +299,10 @@ func (c *cluster) mustNewMember(t testing.TB) *member {
 			clientMaxCallRecvMsgSize:    c.cfg.ClientMaxCallRecvMsgSize,
 			useIP:                       c.cfg.UseIP,
 			enableLeaseCheckpoint:       c.cfg.EnableLeaseCheckpoint,
+			leaseCheckpointPersist:      c.cfg.LeaseCheckpointPersist,
 			leaseCheckpointInterval:     c.cfg.LeaseCheckpointInterval,
 			WatchProgressNotifyInterval: c.cfg.WatchProgressNotifyInterval,
+			CorruptCheckTime:            c.cfg.CorruptCheckTime,
 		})
 	m.DiscoveryURL = c.cfg.DiscoveryURL
 	if c.cfg.UseGRPC {
@@ -588,7 +592,9 @@ type memberConfig struct {
 	useIP                       bool
 	enableLeaseCheckpoint       bool
 	leaseCheckpointInterval     time.Duration
+	leaseCheckpointPersist      bool
 	WatchProgressNotifyInterval time.Duration
+	CorruptCheckTime            time.Duration
 }
 
 // mustNewMember return an inited member with the given name. If peerTLS is
@@ -681,11 +687,14 @@ func mustNewMember(t testing.TB, mcfg memberConfig) *member {
 	m.useIP = mcfg.useIP
 	m.EnableLeaseCheckpoint = mcfg.enableLeaseCheckpoint
 	m.LeaseCheckpointInterval = mcfg.leaseCheckpointInterval
+	m.LeaseCheckpointPersist = mcfg.leaseCheckpointPersist
 
 	m.WatchProgressNotifyInterval = mcfg.WatchProgressNotifyInterval
 
 	m.InitialCorruptCheck = true
-
+	if mcfg.CorruptCheckTime > time.Duration(0) {
+		m.CorruptCheckTime = mcfg.CorruptCheckTime
+	}
 	lcfg := logutil.DefaultZapLoggerConfig
 	m.LoggerConfig = &lcfg
 	m.LoggerConfig.OutputPaths = []string{"/dev/null"}

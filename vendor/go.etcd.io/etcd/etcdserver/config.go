@@ -119,6 +119,12 @@ type ServerConfig struct {
 	// MaxRequestBytes is the maximum request size to send over raft.
 	MaxRequestBytes uint
 
+	// MaxConcurrentStreams specifies the maximum number of concurrent
+	// streams that each client can open at a time.
+	MaxConcurrentStreams uint32
+
+	WarningApplyDuration time.Duration
+
 	StrictReconfigCheck bool
 
 	// ClientCertAuthEnabled is true when cert has been signed by the client CA.
@@ -152,10 +158,12 @@ type ServerConfig struct {
 
 	ForceNewCluster bool
 
-	// EnableLeaseCheckpoint enables primary lessor to persist lease remainingTTL to prevent indefinite auto-renewal of long lived leases.
+	// EnableLeaseCheckpoint enables leader to send regular checkpoints to other members to prevent reset of remaining TTL on leader change.
 	EnableLeaseCheckpoint bool
 	// LeaseCheckpointInterval time.Duration is the wait duration between lease checkpoints.
 	LeaseCheckpointInterval time.Duration
+	// LeaseCheckpointPersist enables persisting remainingTTL to prevent indefinite auto-renewal of long lived leases. Always enabled in v3.6. Should be used to ensure smooth upgrade from v3.5 clusters with this feature enabled.
+	LeaseCheckpointPersist bool
 
 	EnableGRPCGateway bool
 

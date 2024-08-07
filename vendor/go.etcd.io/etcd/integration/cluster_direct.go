@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !cluster_proxy
 // +build !cluster_proxy
 
 package integration
@@ -22,6 +23,8 @@ import (
 	"go.etcd.io/etcd/etcdserver/api/v3lock/v3lockpb"
 	pb "go.etcd.io/etcd/etcdserver/etcdserverpb"
 )
+
+const ThroughProxy = false
 
 func toGRPC(c *clientv3.Client) grpcAPI {
 	return grpcAPI{

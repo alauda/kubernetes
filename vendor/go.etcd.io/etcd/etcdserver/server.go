@@ -25,6 +25,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -258,10 +259,6 @@ type EtcdServer struct {
 	peerRt   http.RoundTripper
 	reqIDGen *idutil.Generator
 
-	// forceVersionC is used to force the version monitor loop
-	// to detect the cluster version immediately.
-	forceVersionC chan struct{}
-
 	// wgMu blocks concurrent waitgroup mutation while server stopping
 	wgMu sync.RWMutex
 	// wg is used to wait for the go routines that depends on the server state
@@ -275,6 +272,9 @@ type EtcdServer struct {
 
 	leadTimeMu      sync.RWMutex
 	leadElectedTime time.Time
+
+	firstCommitInTermMu sync.RWMutex
+	firstCommitInTermC  chan struct{}
 
 	*AccessController
 }
@@ -323,6 +323,17 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 			plog.Fatalf("create snapshot directory error: %v", err)
 		}
 	}
+
+	if err = fileutil.RemoveMatchFile(cfg.Logger, cfg.SnapDir(), func(fileName string) bool {
+		return strings.HasPrefix(fileName, "tmp")
+	}); err != nil {
+		cfg.Logger.Error(
+			"failed to remove temp file(s) in snapshot directory",
+			zap.String("path", cfg.SnapDir()),
+			zap.Error(err),
+		)
+	}
+
 	ss := snap.New(cfg.Logger, cfg.SnapDir())
 
 	bepath := cfg.backendPath()
@@ -520,16 +531,16 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 				storage:     NewStorage(w, ss),
 			},
 		),
-		id:               id,
-		attributes:       membership.Attributes{Name: cfg.Name, ClientURLs: cfg.ClientURLs.StringSlice()},
-		cluster:          cl,
-		stats:            sstats,
-		lstats:           lstats,
-		SyncTicker:       time.NewTicker(500 * time.Millisecond),
-		peerRt:           prt,
-		reqIDGen:         idutil.NewGenerator(uint16(id), time.Now()),
-		forceVersionC:    make(chan struct{}),
-		AccessController: &AccessController{CORS: cfg.CORS, HostWhitelist: cfg.HostWhitelist},
+		id:                 id,
+		attributes:         membership.Attributes{Name: cfg.Name, ClientURLs: cfg.ClientURLs.StringSlice()},
+		cluster:            cl,
+		stats:              sstats,
+		lstats:             lstats,
+		SyncTicker:         time.NewTicker(500 * time.Millisecond),
+		peerRt:             prt,
+		reqIDGen:           idutil.NewGenerator(uint16(id), time.Now()),
+		AccessController:   &AccessController{CORS: cfg.CORS, HostWhitelist: cfg.HostWhitelist},
+		firstCommitInTermC: make(chan struct{}),
 	}
 	serverID.With(prometheus.Labels{"server_id": id.String()}).Set(1)
 
@@ -543,9 +554,11 @@ func NewServer(cfg ServerConfig) (srv *EtcdServer, err error) {
 	srv.lessor = lease.NewLessor(
 		srv.getLogger(),
 		srv.be,
+		srv.cluster,
 		lease.LessorConfig{
 			MinLeaseTTL:                int64(math.Ceil(minTTL.Seconds())),
 			CheckpointInterval:         cfg.LeaseCheckpointInterval,
+			CheckpointPersist:          cfg.LeaseCheckpointPersist,
 			ExpiredLeasesRetryInterval: srv.Cfg.ReqTimeout(),
 		})
 
@@ -1059,37 +1072,7 @@ func (s *EtcdServer) run() {
 			f := func(context.Context) { s.applyAll(&ep, &ap) }
 			sched.Schedule(f)
 		case leases := <-expiredLeaseC:
-			s.goAttach(func() {
-				// Increases throughput of expired leases deletion process through parallelization
-				c := make(chan struct{}, maxPendingRevokes)
-				for _, lease := range leases {
-					select {
-					case c <- struct{}{}:
-					case <-s.stopping:
-						return
-					}
-					lid := lease.ID
-					s.goAttach(func() {
-						ctx := s.authStore.WithRoot(s.ctx)
-						_, lerr := s.LeaseRevoke(ctx, &pb.LeaseRevokeRequest{ID: int64(lid)})
-						if lerr == nil {
-							leaseExpired.Inc()
-						} else {
-							if lg != nil {
-								lg.Warn(
-									"failed to revoke lease",
-									zap.String("lease-id", fmt.Sprintf("%016x", lid)),
-									zap.Error(lerr),
-								)
-							} else {
-								plog.Warningf("failed to revoke %016x (%q)", lid, lerr.Error())
-							}
-						}
-
-						<-c
-					})
-				}
-			})
+			s.revokeExpiredLeases(leases)
 		case err := <-s.errorc:
 			if lg != nil {
 				lg.Warn("server error", zap.Error(err))
@@ -1107,6 +1090,45 @@ func (s *EtcdServer) run() {
 			return
 		}
 	}
+}
+
+func (s *EtcdServer) revokeExpiredLeases(leases []*lease.Lease) {
+	s.goAttach(func() {
+		lg := s.Logger()
+		// Increases throughput of expired leases deletion process through parallelization
+		c := make(chan struct{}, maxPendingRevokes)
+		for _, curLease := range leases {
+			select {
+			case c <- struct{}{}:
+			case <-s.stopping:
+				return
+			}
+
+			f := func(lid int64) {
+				s.goAttach(func() {
+					ctx := s.authStore.WithRoot(s.ctx)
+					_, lerr := s.LeaseRevoke(ctx, &pb.LeaseRevokeRequest{ID: lid})
+					if lerr == nil {
+						leaseExpired.Inc()
+					} else {
+						if lg != nil {
+							lg.Warn(
+								"failed to revoke lease",
+								zap.String("lease-id", fmt.Sprintf("%016x", lid)),
+								zap.Error(lerr),
+							)
+						} else {
+							plog.Warningf("failed to revoke %016x (%q)", lid, lerr.Error())
+						}
+					}
+
+					<-c
+				})
+			}
+
+			f(int64(curLease.ID))
+		}
+	})
 }
 
 func (s *EtcdServer) applyAll(ep *etcdProgress, apply *apply) {
@@ -1776,6 +1798,10 @@ func (s *EtcdServer) mayPromoteMember(id types.ID) error {
 // Note: it will return nil if member is not found in cluster or if member is not learner.
 // These two conditions will be checked before apply phase later.
 func (s *EtcdServer) isLearnerReady(id uint64) error {
+	if err := s.waitAppliedIndex(); err != nil {
+		return err
+	}
+
 	rs := s.raftStatus()
 
 	// leader's raftStatus.Progress is not nil
@@ -1795,12 +1821,16 @@ func (s *EtcdServer) isLearnerReady(id uint64) error {
 		}
 	}
 
-	if isFound {
-		leaderMatch := rs.Progress[leaderID].Match
-		// the learner's Match not caught up with leader yet
-		if float64(learnerMatch) < float64(leaderMatch)*readyPercent {
-			return ErrLearnerNotReady
-		}
+	// We should return an error in API directly, to avoid the request
+	// being unnecessarily delivered to raft.
+	if !isFound {
+		return membership.ErrIDNotFound
+	}
+
+	leaderMatch := rs.Progress[leaderID].Match
+	// the learner's Match not caught up with leader yet
+	if float64(learnerMatch) < float64(leaderMatch)*readyPercent {
+		return ErrLearnerNotReady
 	}
 
 	return nil
@@ -1910,6 +1940,16 @@ func (s *EtcdServer) leaderChangedNotify() <-chan struct{} {
 	s.leaderChangedMu.RLock()
 	defer s.leaderChangedMu.RUnlock()
 	return s.leaderChanged
+}
+
+// FirstCommitInTermNotify returns channel that will be unlocked on first
+// entry committed in new term, which is necessary for new leader to answer
+// read-only requests (leader is not able to respond any read-only requests
+// as long as linearizable semantic is required)
+func (s *EtcdServer) FirstCommitInTermNotify() <-chan struct{} {
+	s.firstCommitInTermMu.RLock()
+	defer s.firstCommitInTermMu.RUnlock()
+	return s.firstCommitInTermC
 }
 
 // RaftStatusGetter represents etcd server and Raft progress.
@@ -2179,10 +2219,8 @@ func (s *EtcdServer) applyEntryNormal(e *raftpb.Entry) {
 	// raft state machine may generate noop entry when leader confirmation.
 	// skip it in advance to avoid some potential bug in the future
 	if len(e.Data) == 0 {
-		select {
-		case s.forceVersionC <- struct{}{}:
-		default:
-		}
+		s.notifyAboutFirstCommitInTerm()
+
 		// promote lessor when the local member is leader and finished
 		// applying all entries from the last term.
 		if s.isLeader() {
@@ -2253,6 +2291,15 @@ func (s *EtcdServer) applyEntryNormal(e *raftpb.Entry) {
 		s.raftRequest(s.ctx, pb.InternalRaftRequest{Alarm: a})
 		s.w.Trigger(id, ar)
 	})
+}
+
+func (s *EtcdServer) notifyAboutFirstCommitInTerm() {
+	newNotifier := make(chan struct{})
+	s.firstCommitInTermMu.Lock()
+	notifierToClose := s.firstCommitInTermC
+	s.firstCommitInTermC = newNotifier
+	s.firstCommitInTermMu.Unlock()
+	close(notifierToClose)
 }
 
 // applyConfChange applies a ConfChange to the server. It is only
@@ -2481,7 +2528,7 @@ func (s *EtcdServer) ClusterVersion() *semver.Version {
 func (s *EtcdServer) monitorVersions() {
 	for {
 		select {
-		case <-s.forceVersionC:
+		case <-s.FirstCommitInTermNotify():
 		case <-time.After(monitorVersionInterval):
 		case <-s.stopping:
 			return
