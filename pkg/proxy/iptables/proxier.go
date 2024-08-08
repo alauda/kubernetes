@@ -263,6 +263,7 @@ func NewProxier(ipt utiliptables.Interface,
 	recorder record.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
+	initOnly bool,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := utilproxy.EnsureSysctl(sysctl, sysctlRouteLocalnet, 1); err != nil {
@@ -274,6 +275,11 @@ func NewProxier(ipt utiliptables.Interface,
 	// plugins handle this, log when config is missing
 	if val, err := sysctl.GetSysctl(sysctlBridgeCallIPTables); err == nil && val != 1 {
 		klog.InfoS("missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
+	}
+
+	if initOnly {
+		klog.InfoS("System initialized and --init-only specified")
+		return nil, nil
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
@@ -360,21 +366,25 @@ func NewDualStackProxier(
 	recorder record.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
+	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
 	ipv4Proxier, err := NewProxier(ipt[0], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
-		nodeIP[0], recorder, healthzServer, ipFamilyMap[v1.IPv4Protocol])
+		nodeIP[0], recorder, healthzServer, ipFamilyMap[v1.IPv4Protocol], initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(ipt[1], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
-		nodeIP[1], recorder, healthzServer, ipFamilyMap[v1.IPv6Protocol])
+		nodeIP[1], recorder, healthzServer, ipFamilyMap[v1.IPv6Protocol], initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+	if initOnly {
+		return nil, nil
 	}
 	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }

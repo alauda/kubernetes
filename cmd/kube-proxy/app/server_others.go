@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -76,13 +77,14 @@ var timeoutForNodePodCIDR = 5 * time.Minute
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.master)
+	return newProxyServer(o.config, o.CleanupAndExit, o.master, o.InitAndExit)
 }
 
 func newProxyServer(
 	config *proxyconfigapi.KubeProxyConfiguration,
 	cleanupAndExit bool,
-	master string) (*ProxyServer, error) {
+	master string,
+	initOnly bool) (*ProxyServer, error) {
 
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -240,6 +242,7 @@ func newProxyServer(
 				recorder,
 				healthzServer,
 				config.NodePortAddresses,
+				initOnly,
 			)
 		} else { // Create a single-stack proxier.
 			var localDetector proxyutiliptables.LocalTrafficDetector
@@ -263,6 +266,7 @@ func newProxyServer(
 				recorder,
 				healthzServer,
 				config.NodePortAddresses,
+				initOnly,
 			)
 		}
 
@@ -307,6 +311,7 @@ func newProxyServer(
 				config.IPVS.Scheduler,
 				config.NodePortAddresses,
 				kernelHandler,
+				initOnly,
 			)
 		} else {
 			var localDetector proxyutiliptables.LocalTrafficDetector
@@ -338,6 +343,7 @@ func newProxyServer(
 				config.IPVS.Scheduler,
 				config.NodePortAddresses,
 				kernelHandler,
+				initOnly,
 			)
 		}
 		if err != nil {

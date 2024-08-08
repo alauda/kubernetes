@@ -51,6 +51,9 @@ import (
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
+	if o.InitAndExit {
+		eturn nil, fmt.Errorf("--init-only is not implemented on Windows")
+	}
 	return newProxyServer(o.config, o.CleanupAndExit, o.master)
 }
 

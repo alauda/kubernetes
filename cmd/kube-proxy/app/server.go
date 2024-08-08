@@ -111,6 +111,8 @@ type Options struct {
 	WriteConfigTo string
 	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
 	CleanupAndExit bool
+	// InitAndExit, when true, makes the proxy server makes configurations that need privileged access, then exit.
+	InitAndExit bool
 	// WindowsService should be set to true if kube-proxy is running as a service on Windows.
 	// Its corresponding flag only gets registered in Windows builds
 	WindowsService bool
@@ -169,6 +171,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(utilflag.IPPortVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address with port for the metrics server to serve on (set to '0.0.0.0:10249' for all IPv4 interfaces and '[::]:10249' for all IPv6 interfaces). Set empty to disable.")
 	fs.BoolVar(&o.config.BindAddressHardFail, "bind-address-hard-fail", o.config.BindAddressHardFail, "If true kube-proxy will treat failure to bind to a port as fatal and exit")
 	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, single port or beginPort+offset, inclusive) that may be consumed in order to proxy service traffic. If (unspecified, 0, or 0-0) then ports will be randomly chosen.")
+	fs.BoolVar(&o.InitAndExit, "init-only", o.InitAndExit, "If true, perform any initialization steps that must be done with full root privileges, and then exit. After doing this, you can run kube-proxy again with only the CAP_NET_ADMIN capability.")
 	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs' or 'kernelspace' (windows). If blank, use the best-available proxy (currently iptables). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
@@ -310,6 +313,9 @@ func (o *Options) Run() error {
 	proxyServer, err := NewProxyServer(o)
 	if err != nil {
 		return err
+	}
+	if o.InitAndExit {
+		return nil
 	}
 
 	if o.CleanupAndExit {

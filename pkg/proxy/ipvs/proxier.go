@@ -367,6 +367,7 @@ func NewProxier(ipt utiliptables.Interface,
 	scheduler string,
 	nodePortAddresses []string,
 	kernelHandler KernelHandler,
+	initOnly bool,
 ) (*Proxier, error) {
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
 	// are connected to a Linux bridge (but not SDN bridges).  Until most
@@ -434,6 +435,11 @@ func NewProxier(ipt utiliptables.Interface,
 		if err := ipvs.ConfigureTimeouts(tcpTimeout, tcpFinTimeout, udpTimeout); err != nil {
 			klog.Warningf("failed to configure IPVS timeouts: %v", err)
 		}
+	}
+
+	if initOnly {
+		klog.InfoS("System initialized and --init-only specified")
+		return nil, nil
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
@@ -536,6 +542,7 @@ func NewDualStackProxier(
 	scheduler string,
 	nodePortAddresses []string,
 	kernelHandler KernelHandler,
+	initOnly bool,
 ) (proxy.Provider, error) {
 
 	safeIpset := newSafeIpset(ipset)
@@ -547,7 +554,7 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIP[0],
-		recorder, healthzServer, scheduler, ipFamilyMap[v1.IPv4Protocol], kernelHandler)
+		recorder, healthzServer, scheduler, ipFamilyMap[v1.IPv4Protocol], kernelHandler, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -556,9 +563,12 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIP[1],
-		nil, nil, scheduler, ipFamilyMap[v1.IPv6Protocol], kernelHandler)
+		nil, nil, scheduler, ipFamilyMap[v1.IPv6Protocol], kernelHandler, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+	if initOnly {
+		return nil, nil
 	}
 
 	// Return a meta-proxier that dispatch calls between the two
