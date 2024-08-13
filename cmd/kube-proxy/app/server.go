@@ -314,6 +314,11 @@ func (o *Options) Run() error {
 	if err != nil {
 		return err
 	}
+	err = proxyServer.SetupPlatform()
+	if err != nil {
+		return err
+	}
+
 	if o.InitAndExit {
 		return nil
 	}
@@ -646,38 +651,7 @@ func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh cha
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
 }
 
-// Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
-// TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
-func (s *ProxyServer) Run() error {
-	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", version.Get())
-
-	// TODO(vmarmol): Use container config for this.
-	var oomAdjuster *oom.OOMAdjuster
-	if s.OOMScoreAdj != nil {
-		oomAdjuster = oom.NewOOMAdjuster()
-		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.OOMScoreAdj)); err != nil {
-			klog.V(2).Info(err)
-		}
-	}
-
-	if s.Broadcaster != nil && s.EventClient != nil {
-		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
-	}
-
-	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
-
-	var errCh chan error
-	if s.BindAddressHardFail {
-		errCh = make(chan error)
-	}
-
-	// Start up a healthz server if requested
-	serveHealthz(s.HealthzServer, errCh)
-
-	// Start up a metrics server if requested
-	serveMetrics(s.MetricsBindAddress, s.ProxyMode, s.EnableProfiling, errCh)
-
+func (s *ProxyServer) SetupPlatform() error {
 	// Tune conntrack, if requested
 	// Conntracker is always nil for windows
 	if s.Conntracker != nil {
@@ -718,6 +692,40 @@ func (s *ProxyServer) Run() error {
 			}
 		}
 	}
+	return nil
+}
+
+// Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
+// TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
+func (s *ProxyServer) Run() error {
+	// To help debugging, immediately log version
+	klog.Infof("Version: %+v", version.Get())
+
+	// TODO(vmarmol): Use container config for this.
+	var oomAdjuster *oom.OOMAdjuster
+	if s.OOMScoreAdj != nil {
+		oomAdjuster = oom.NewOOMAdjuster()
+		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.OOMScoreAdj)); err != nil {
+			klog.V(2).Info(err)
+		}
+	}
+
+	if s.Broadcaster != nil && s.EventClient != nil {
+		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
+	}
+
+	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
+
+	var errCh chan error
+	if s.BindAddressHardFail {
+		errCh = make(chan error)
+	}
+
+	// Start up a healthz server if requested
+	serveHealthz(s.HealthzServer, errCh)
+
+	// Start up a metrics server if requested
+	serveMetrics(s.MetricsBindAddress, s.ProxyMode, s.EnableProfiling, errCh)
 
 	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
 	if err != nil {
