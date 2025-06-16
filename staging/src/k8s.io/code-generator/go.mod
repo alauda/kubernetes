@@ -2,7 +2,11 @@
 
 module k8s.io/code-generator
 
-go 1.22.0
+go 1.23.0
+
+godebug default=go1.23
+
+godebug winsymlink=0
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -11,7 +15,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0
 	github.com/spf13/pflag v1.0.5
-	golang.org/x/text v0.16.0
+	golang.org/x/text v0.23.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70
@@ -35,7 +39,7 @@ require (
 	github.com/onsi/gomega v1.33.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
