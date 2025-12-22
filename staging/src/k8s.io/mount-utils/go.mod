@@ -2,7 +2,9 @@
 
 module k8s.io/mount-utils
 
-go 1.23.0
+go 1.24.0
+
+toolchain go1.24.11
 
 godebug default=go1.23
 
@@ -11,9 +13,9 @@ godebug winsymlink=0
 require (
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/moby/sys/userns v0.1.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
-	golang.org/x/sys v0.26.0
+	golang.org/x/sys v0.38.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 )
