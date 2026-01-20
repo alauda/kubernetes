@@ -14,6 +14,8 @@ godebug default=go1.23
 
 godebug winsymlink=0
 
+// CVE fixes by alauda
+
 require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
@@ -226,6 +228,7 @@ require (
 )
 
 replace (
+	golang.org/x/oauth2 => golang.org/x/oauth2 v0.27.0
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
