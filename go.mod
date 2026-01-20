@@ -67,7 +67,7 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.16
 	go.etcd.io/etcd/client/pkg/v3 v3.5.16
 	go.etcd.io/etcd/client/v3 v3.5.16
-	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.42.0
+	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.44.0
 	go.opentelemetry.io/otel v1.28.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.27.0
 	go.opentelemetry.io/otel/metric v1.28.0
@@ -78,7 +78,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.45.0
 	golang.org/x/net v0.47.0
-	golang.org/x/oauth2 v0.23.0
+	golang.org/x/oauth2 v0.27.0
 	golang.org/x/sync v0.18.0
 	golang.org/x/sys v0.38.0
 	golang.org/x/term v0.37.0
