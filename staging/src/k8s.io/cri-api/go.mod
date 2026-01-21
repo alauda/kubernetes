@@ -9,7 +9,7 @@ toolchain go1.24.9
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/grpc v1.58.3
+	google.golang.org/grpc v1.59.0
 )
 
 require (
