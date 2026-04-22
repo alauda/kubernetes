@@ -2,9 +2,7 @@
 
 module k8s.io/cli-runtime
 
-go 1.24.0
-
-toolchain go1.24.11
+go 1.25.0
 
 godebug default=go1.23
 
@@ -65,7 +63,7 @@ require (
 	github.com/xlab/treeprint v1.2.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/term v0.38.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
