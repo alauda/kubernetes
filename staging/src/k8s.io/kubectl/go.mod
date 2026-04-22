@@ -2,7 +2,7 @@
 
 module k8s.io/kubectl
 
-go 1.24.0
+go 1.25.0
 
 godebug default=go1.24
 
@@ -27,7 +27,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sys v0.40.0
+	golang.org/x/sys v0.42.0
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
