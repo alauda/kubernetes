@@ -19,9 +19,9 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/goleak v1.3.0
-	golang.org/x/net v0.48.0
+	golang.org/x/net v0.55.0
 	golang.org/x/oauth2 v0.34.0
-	golang.org/x/term v0.38.0
+	golang.org/x/term v0.43.0
 	golang.org/x/time v0.9.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
@@ -58,8 +58,8 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
