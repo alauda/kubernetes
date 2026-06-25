@@ -9,7 +9,7 @@ godebug default=go1.23
 godebug winsymlink=0
 
 require (
-	golang.org/x/time v0.7.0
+	golang.org/x/time v0.9.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
