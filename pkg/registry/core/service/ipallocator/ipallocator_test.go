@@ -960,3 +960,37 @@ func BenchmarkIPAllocatorAllocateNextIPv6Size65535(b *testing.B) {
 		r.AllocateNext()
 	}
 }
+
+func TestAllocateNextStopOnError(t *testing.T) {
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
+
+	calls := 0
+	client.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		calls++
+		return true, nil, fmt.Errorf("server error")
+	}))
+
+	a, err := NewIPAllocator(cidr, client.NetworkingV1(), ipInformer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.ipAddressSynced = func() bool { return true }
+	defer a.Destroy()
+
+	_, err = a.AllocateNext()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "server error" {
+		t.Fatalf("expected 'server error', got %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 call, got %d", calls)
+	}
+}
