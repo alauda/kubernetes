@@ -2,7 +2,7 @@
 
 module k8s.io/cli-runtime
 
-go 1.25.0
+go 1.26.0
 
 godebug default=go1.25
 
