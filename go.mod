@@ -6,7 +6,7 @@
 
 module k8s.io/kubernetes
 
-go 1.25.0
+go 1.26.0
 
 godebug default=go1.24
 
@@ -72,7 +72,7 @@ require (
 	go.uber.org/goleak v1.3.0
 	go.uber.org/zap v1.27.0
 	go.yaml.in/yaml/v2 v2.4.2
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/net v0.58.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
