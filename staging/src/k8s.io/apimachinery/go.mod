@@ -2,7 +2,7 @@
 
 module k8s.io/apimachinery
 
-go 1.25.0
+go 1.26.0
 
 godebug default=go1.24
 
