@@ -10,7 +10,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/grpc v1.83.1
+	google.golang.org/grpc v1.83.2
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
