@@ -48,7 +48,6 @@ func (mc MemCheck) Check() (warnings, errorList []error) {
 func addOSValidator(validators []system.Validator, reporter *system.StreamReporter, kubeletVersion string) []system.Validator {
 	validators = append(validators,
 		&system.OSValidator{Reporter: reporter},
-		&system.CgroupsValidator{Reporter: reporter, KubeletVersion: kubeletVersion},
 	)
 	return validators
 }
@@ -70,7 +69,6 @@ func addIPv4Checks(checks []Checker) []Checker {
 
 // addSwapCheck adds a swap check
 func addSwapCheck(checks []Checker) []Checker {
-	checks = append(checks, SwapCheck{})
 	return checks
 }
 
