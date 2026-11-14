@@ -2,9 +2,9 @@
 
 module k8s.io/mount-utils
 
-go 1.25.0
+go 1.26.0
 
-godebug default=go1.23
+godebug default=go1.24
 
 godebug winsymlink=0
 
@@ -13,14 +13,14 @@ require (
 	github.com/moby/sys/userns v0.1.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20240823005443-9b4947da3948
-	golang.org/x/sys v0.46.0
+	golang.org/x/sys v0.49.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
