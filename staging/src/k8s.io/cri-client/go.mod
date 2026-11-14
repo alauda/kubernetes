@@ -10,7 +10,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/stretchr/testify v1.11.1
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0
 	go.opentelemetry.io/otel/sdk v1.45.0
 	go.opentelemetry.io/otel/trace v1.45.0
 	golang.org/x/sys v0.49.0
